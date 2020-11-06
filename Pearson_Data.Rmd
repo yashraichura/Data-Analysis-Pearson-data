@@ -1,0 +1,393 @@
+---
+title: 'Pearson Data Set'
+author: "Purba Roy"
+---
+
+
+
+```{r Setup, message=FALSE}
+# Load standard libraries
+library(tidyverse)
+library(gridExtra)
+```
+
+
+
+#### Loading the data, Creating density plots of both heights on the same figure. 
+
+
+
+**We see that the mean of son's height is more than the mean of father's height.**
+**By looking at both the density plot of father and son data, we see that both have normal distribution, where the mean of son data is more than father data. We also see that the distribution for sons data is slightly more spread out than father data, and we corroborate that by calculating the stand deviation which proves that the SD for son is greater than Father.**
+```{r}
+#importing data
+FatherSonData <- read.csv("fatherson.csv")
+
+FatherSonData <- separate(FatherSonData,fheight.sheight, into=c("fatherHeight","sonHeight"), sep ="\t")
+head(FatherSonData)
+# first, converting character into numeric
+FatherSonData$fatherHeight <- as.numeric(as.character((FatherSonData$fatherHeight)))
+
+FatherSonData$sonHeight <- as.numeric(as.character((FatherSonData$sonHeight)))
+meanF <- mean(FatherSonData$fatherHeight)
+meanS <- mean(FatherSonData$sonHeight)
+
+sdF <- sd(FatherSonData$fatherHeight)
+sdS <- sd(FatherSonData$sonHeight)
+sdF
+sdS
+
+ggplot(FatherSonData)+
+  geom_density( aes(x=fatherHeight), color="darkblue", alpha=0.01) +
+  geom_density( aes(x=sonHeight), color="red", alpha=0.01) +
+  geom_vline( aes(xintercept=meanF),color="darkblue",linetype="dashed")+
+  geom_vline( aes(xintercept=meanS),color="red",linetype="dashed")
+
+```
+####  
+doing a $t$-test.  
+
+
+
+**We go by the formula for t-test as (mA-mB)/(sqrt(((s^2)/nA)-((s^2)/nB)))  where mA and mB is the mean of son and father respectively.**
+**s is the standard deviation, and nA and nB are the sample here**
+**Here, we have used pooled standard deviation as the standard deviations of both the datasets are almost same, and hecne treated identical. We then calculate the pooled standard deviation and use it in the formula for t test.**
+**the difference in means of father and son data is 2.532004**
+```{r}
+
+# calculating the pooled standard deviation
+ PooledSD <- sqrt(((sdS^2 * (1078-1))+ (sdF^2 * (1078-1))) / (1078+1078-2))
+PooledSD
+
+# difference of the Son's mean and Father's mean
+differenceMean <- meanS-meanF
+
+# applying the T-test formula manually.
+t <- differenceMean/sqrt((PooledSD^2 / 1078)+(PooledSD^2 / 1078))
+t
+
+
+#t.test(FatherSonData$sonHeight,FatherSonData$fatherHeight, var.equal = TRUE)
+
+```
+
+\textcolor{blue}{Hint: read OIS 7.3}
+
+#### Lets Look up the $t$-distribution table. 
+
+
+**likelihood that such a t value happnes just by chance: 1.278474e-16**
+**After looking at t distribution table, we see that our values are beyond the table which just has degree of freedom upto 17. Our degree of freedom is 1077, and our t value is 8.32 which is also beyond the table. So to calculate the likelihood that it happens by random chance, we calculate the student t ditribution for the upper tail.**
+
+**We see that the likelihood that the event happening by chance is 0.0000000000000001278474, which is significantly lower than 0.05 (lower tail), which means that its proven statistically that the sons height is more than fathers height**
+
+
+```{r}
+#?pt
+
+#quantile(FatherSonData$fatherHeight, prob=c(0.25,0.50,0.75,1))
+
+# distribution function to check the randomness of any event
+pt(t,1077,lower.tail = FALSE)
+
+
+
+```
+
+
+**As seen above, the chance that the event of son's height is more than father is purely due to randomness is 1.278474e-16 which is very less than 0.05, and hence it is statiscally proven that the son's height is more than fathers height**
+
+### Fathers and Sons - the Monte Carlo approach
+
+let's try doing Monte Carlo analysis on a computer.  We proceed as follows: creating two samples of random normals, similar to the data above, using the mean and standard deviation over both fathers and sons.  Calling one of these samples `fathers` and the other `sons`.  
+
+
+**By creating 2 samples for father and son, we find that the  difference of the means are ~ 2.72077.**
+**By again executing rnorm, or creating samples again and again, we find that the means vary as the samples selected are random in nature.**
+
+```{r}
+# creating the sample for father and son using the initial means and standard deviation.
+
+fathers <- rnorm(1078,meanF,sdF)
+sons <- rnorm(1078,meanS,sdS)
+#fathers 
+#sons
+
+
+#difference in mean of fathers height  and sons height = 3.014539
+mean(sons) -mean(fathers)
+
+
+```
+
+
+**By computing the overall mean and standard deviation, overall mean ~173.1912, overall SD~ 7.173111 and father sons mean difference :~ 0.4465092**
+**As compared to the previous part, where our difference in mean was 3.014539, the mean difference of overall sample is significantly lower than that. There is a significant difference between the sample mean and the population mean.**
+
+
+```{r}
+#computing overall mean of combined fathers and sons heights.
+  
+Overall <- rbind(FatherSonData$fatherHeight,FatherSonData$sonHeight)
+Overall_mean <- mean(Overall)
+
+Overall_sd <- sd(Overall)
+
+#computing new normal random variables
+fathers <- rnorm(1078,Overall_mean,Overall_sd)
+sons <- rnorm(1078,Overall_mean,Overall_sd)
+
+#difference in mean of fathers height and sons height
+mean(sons)- mean(fathers) 
+
+
+```
+
+
+
+
+
+**By computing the values for 2000 times, we find that the mean of the difference values is 0.002038227.**
+**This result is obtained by taking in account all the difference in means for the 2000 samples we created, and then taking the mean value of that. **
+**The standard deviation of that is 0.3136551**
+**While doing the t-test, we find the value of standard deviation to be 7.062093, wheras we get 0.3136 here, there is a stark difference as this is the standard deviation of the differences in the mean value.**
+**the largest difference (in absolute value) is 1.218159**
+**On taking 100000 samples, we notice that the mean is almost same as the case where we took 2000 samples. This just means that as we increase our sample size, the mean gets normalised and reaches normal distribution.**
+```{r}
+n <- 1078
+
+
+options(scipen=999)
+
+# creating a function to create random variables.
+functionMC <- function(Overall_mean,Overall_sd){
+  fathersMC <- rnorm(n,Overall_mean,Overall_sd)
+  sonsMC <- rnorm(n,Overall_mean,Overall_sd)
+  m1 <<- mean(sonsMC)- mean(fathersMC) # storing the difference in means for father and sons height.
+}
+
+
+MeanMC<- NULL
+# repeating the above function 2000 times.
+for (i in 1: 2000){
+ MeanMC[i]<- functionMC(Overall_mean,Overall_sd)
+ 
+}
+head(MeanMC,9) # viewing the result
+
+# finding the mean of the difference values.
+mean(MeanMC)
+
+# finding the standard deviation of the difference of values.
+sd(MeanMC)
+
+#hist(MeanMC)
+
+
+#finding the maximum absolute value of the differences of the  mean.
+max(abs(MeanMC))
+```
+
+
+**Here we see that after plotting the differences of the mean values, its a normal distribution**
+```{r}
+
+#plotting the histogram
+hist(MeanMC)
+
+```
+```{r}
+
+# code chunk to generate 100000 samples, to compare the mean with 2000 samples.
+n <- 1078
+
+
+options(scipen=999)
+
+# creating a function to create random variables.
+functionMC <- function(Overall_mean,Overall_sd){
+  fathersMC <- rnorm(n,Overall_mean,Overall_sd)
+  sonsMC <- rnorm(n,Overall_mean,Overall_sd)
+  m1 <<- mean(sonsMC)- mean(fathersMC) # storing the difference in means for father and sons height.
+}
+#MeanMC<- functionMC(Overall_mean,Overall_sd)
+# repeating the above function 2000 times.
+for (i in 1: 100000){
+ MeanMC[i]<- functionMC(Overall_mean,Overall_sd)
+ 
+}
+head(MeanMC,9) # viewing the result
+
+# finding the mean of the difference values.
+mean(MeanMC)
+
+# finding the standard deviation of the difference of values.
+sd(MeanMC)
+
+#hist(MeanMC)
+
+
+#finding the maximum absolute value of the differences of the  mean.
+max(abs(MeanMC))
+```
+
+```{r}
+
+# attempt at MonteCarlo function- approach 2
+#n<-1078
+
+#functionSample <- function(n,Overall_mean,Overall_sd){
+ # fathersSon <- rnorm(n,Overall_mean,Overall_sd)
+  #stat<-sqrt(n)*mean(fathersSon)/sd(fathersSon)
+  # get the test decision, by comparing it with 1.96 as it denotes 2.5% confidence interval on each side 
+  #decision<-abs(stat)>1.96
+  #return(list("decision"=decision))
+#}
+
+ #n_grid<-c(fathersSon, 1:1000)
+#param_list=list("n"=n_grid, "Overall_mean"=Overall_mean, "Overall_sd"=Overall_sd)
+
+#ResultMC <- MonteCarlo(func =functionSample,nrep=1000,param_list=param_list)
+
+#summary(ResultMC)
+
+#df<-MakeFrame(ResultMC)
+
+#View(df)
+
+```
+
+
+
+#### Let's Find the 95\% quantile of (the absolute value) your difference. 
+  
+  
+
+**the actual father son difference we found in the data comes to 2.532004**
+**The 95% quantile of the absolute value of the difference is 0.62581171 **
+**On comparing the 2 values, we see that the 95% quantile of the abosulte value of the difference is significantly lower.**
+```{r}
+# findin
+quantile(abs(MeanMC), prob= 0.95)
+```
+\textcolor{blue}{Hint: use the R function \texttt{quantile} for this.}
+
+#### Parallel Computing 
+
+
+
+```{r}
+#install.packages("foreach")
+#install.packages("doParallel")
+library(foreach)
+library(doParallel)
+```
+
+
+**Using DoParralel and foreach package, I used a foreach loop to create 10,000 samples.**
+
+```{r}
+
+
+#foreach (i=1:20000) %dopar% {
+ #  MeanParralel[i]<- functionParrelel(Overall_mean,Overall_sd)
+  # fathersP <- rnorm(n,Overall_mean,Overall_sd)
+  #sonsP <- rnorm(n,Overall_mean,Overall_sd)
+  #mP1 <<- mean(sonsP)- mean(fathersP)
+ 
+#}
+
+
+registerDoParallel(4)  # use multicore, set to the number of our cores
+
+# using foreach and DoParallel package for parralel computing
+
+trials <- 10000
+system.time({
+ r <- foreach(icount(trials), .combine=rbind) %dopar% {
+    
+fathersP1 <- rnorm(n,Overall_mean,Overall_sd)
+ sonsP1 <- rnorm(n,Overall_mean,Overall_sd)
+ 
+ mParrelel1 <<- mean(sonsP1)- mean(fathersP1)
+}
+})
+
+
+hist(r)
+stopImplicitCluster()
+```
+
+Creating a table that shows how the simulation time depends on the number of employed CPU cores. 
+
+
+**ANSWER**
+**We run the code in parallel by setting the number of cores as 1,2 and 4. ad we see in our table the noticible difference in simulation time, as it decreases from 8 sec to 3.8 sec. **
+**For the number of cores set as 1, the elapsed time is 8 sec, for the number of cores set as 2, the elapsed time is 4.71 sec. And for the number of cores set as 4, the elapsed time drastically goes down to 3.80**
+```{r}
+
+# number of core set to 1
+cpun=1
+registerDoParallel(cpun)  # use multicore, set to the number of our cores
+
+# using foreach and DoParallel package for parralel computing
+
+trials <- 10000
+s <- system.time({
+ r <- foreach(icount(trials), .combine=rbind) %dopar% {
+    
+fathersP1 <- rnorm(n,Overall_mean,Overall_sd)
+ sonsP1 <- rnorm(n,Overall_mean,Overall_sd)
+ 
+ mParrelel1 <<- mean(sonsP1)- mean(fathersP1)
+}
+})
+ 
+df<-data.frame(cpun,s[3])
+names(df)<-c("CPU","Time")
+
+ #core set to 2
+cpun1 =2
+registerDoParallel(cpun1)  # use multicore, set to the number of our cores
+
+# using foreach and DoParallel package for parralel computing
+
+trials <- 10000
+s1 <- system.time({
+ r <- foreach(icount(trials), .combine=rbind) %dopar% {
+    
+fathersP1 <- rnorm(n,Overall_mean,Overall_sd)
+ sonsP1 <- rnorm(n,Overall_mean,Overall_sd)
+ 
+ mParrelel1 <<- mean(sonsP1)- mean(fathersP1)
+}
+})
+
+
+df <-add_row(df, CPU=cpun1,Time=s1[3])
+
+cpun2=4
+# for number of cores as 4
+registerDoParallel(cpun2)  # use multicore, set to the number of our cores
+
+# using foreach and DoParallel package for parralel computing
+
+trials <- 10000
+s2 <- system.time({
+ r <- foreach(icount(trials), .combine=rbind) %dopar% {
+    
+fathersP1 <- rnorm(n,Overall_mean,Overall_sd)
+ sonsP1 <- rnorm(n,Overall_mean,Overall_sd)
+ 
+ mParrelel1 <<- mean(sonsP1)- mean(fathersP1)
+}
+})
+
+
+df <-add_row(df, CPU=cpun2,Time=s2[3])
+df
+stopImplicitCluster()
+
+```
+References: https://nceas.github.io/oss-lessons/parallel-computing-in-r/parallel-computing-in-r.html
+
